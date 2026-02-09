@@ -281,15 +281,29 @@
 
         <div class="controls">
             <button class="control-btn" onclick="connectWallet()" id="connect-btn">Connect Wallet</button>
+            <button class="control-btn" onclick="showPrivateKeyInput()" id="pk-btn">Use Private Key</button>
             <button class="control-btn" onclick="resetStats()">Reset Stats</button>
             <button class="control-btn" onclick="shareResults()">Share Results</button>
             <button class="control-btn" onclick="toggleAutoMode()">Auto Mode</button>
         </div>
 
+        <div id="pk-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000;">
+            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #1a1a1a; border: 2px solid #00ff41; border-radius: 10px; padding: 30px; max-width: 500px; width: 90%;">
+                <h3 style="color: #00ff41; margin-bottom: 20px; text-align: center;">Import Your Wallet</h3>
+                <p style="color: #888; margin-bottom: 15px; font-size: 0.9rem;">Enter your Gorbagana wallet private key to spend real GOR:</p>
+                <input type="password" id="pk-input" placeholder="Your private key..." style="width: 100%; padding: 10px; background: #000; border: 1px solid #333; color: #00ff41; border-radius: 5px; margin-bottom: 15px; font-family: monospace;">
+                <div style="display: flex; gap: 10px; justify-content: center;">
+                    <button onclick="importWallet()" style="padding: 10px 20px; background: #00ff41; color: black; border: none; border-radius: 5px; cursor: pointer; font-weight: bold;">Import Wallet</button>
+                    <button onclick="closeModal()" style="padding: 10px 20px; background: #333; color: white; border: none; border-radius: 5px; cursor: pointer;">Cancel</button>
+                </div>
+                <p style="color: #666; font-size: 0.8rem; margin-top: 10px; text-align: center;">⚠️ Only enter keys you trust. Never share your private key!</p>
+            </div>
+        </div>
+
         <div class="log" id="log">
             <div class="log-entry log-info">🗑️ Welcome to Gorbagana Speed Test!</div>
             <div class="log-entry log-info">💰 Each click spends 0.001 GOR in REAL transactions</div>
-            <div class="log-entry log-info">🔗 Connect wallet first, then stress test the chain!</div>
+            <div class="log-entry log-info">🔗 Connect wallet or import private key to use YOUR GOR!</div>
             <div class="log-entry log-info">⚡ Real economic activity = Real TPS measurement</div>
         </div>
     </div>
@@ -360,28 +374,91 @@
             stats.gorPerSecond = stats.currentTPS * GOR_PER_TX;
         }
 
+        function showPrivateKeyInput() {
+            document.getElementById('pk-modal').style.display = 'block';
+            document.getElementById('pk-input').focus();
+        }
+
+        function closeModal() {
+            document.getElementById('pk-modal').style.display = 'none';
+            document.getElementById('pk-input').value = '';
+        }
+
+        async function importWallet() {
+            const privateKey = document.getElementById('pk-input').value.trim();
+            
+            if (!privateKey) {
+                log('❌ Please enter a private key!', 'error');
+                return;
+            }
+
+            try {
+                // Import wallet from private key
+                const secretKey = solanaWeb3.bs58?.decode ? solanaWeb3.bs58.decode(privateKey) : 
+                                  (() => { throw new Error('Base58 decoder not available'); })();
+                
+                wallet = solanaWeb3.Keypair.fromSecretKey(secretKey);
+                walletConnected = true;
+                
+                // Get real balance from Gorbagana
+                const balance = await connection.getBalance(wallet.publicKey);
+                stats.walletBalance = balance / LAMPORTS_PER_GOR;
+                
+                document.getElementById('connect-btn').textContent = `Connected: ${wallet.publicKey.toString().substring(0, 8)}...`;
+                document.getElementById('connect-btn').style.background = 'rgba(0, 255, 65, 0.4)';
+                document.getElementById('pk-btn').style.display = 'none';
+                
+                log(`🟢 Real wallet connected: ${wallet.publicKey.toString().substring(0, 8)}...`, 'success');
+                log(`💰 Real balance: ${stats.walletBalance.toFixed(3)} GOR`, 'success');
+                log(`🔥 Ready to spend real GOR for TPS testing!`, 'info');
+                
+                closeModal();
+                updateDisplay();
+            } catch (error) {
+                log(`❌ Invalid private key: ${error.message}`, 'error');
+            }
+        }
+
         async function connectWallet() {
             if (walletConnected) return;
 
             try {
-                // For demo purposes, create a temporary wallet with some GOR
-                wallet = solanaWeb3.Keypair.generate();
-                walletConnected = true;
-                
-                // Simulate wallet with some balance for testing
-                stats.walletBalance = 10.0; // Start with 10 GOR for testing
-                
-                document.getElementById('connect-btn').textContent = 'Wallet Connected';
-                document.getElementById('connect-btn').style.background = 'rgba(0, 255, 65, 0.4)';
-                
-                log(`🟢 Wallet connected: ${wallet.publicKey.toString().substring(0, 8)}...`, 'success');
-                log(`💰 Demo balance: ${stats.walletBalance} GOR (simulated for testing)`, 'info');
-                
-                updateDisplay();
+                // Try to connect browser wallet (Phantom, etc.)
+                if (window.solana && window.solana.isPhantom) {
+                    const resp = await window.solana.connect();
+                    wallet = {
+                        publicKey: resp.publicKey,
+                        signTransaction: window.solana.signTransaction
+                    };
+                    walletConnected = true;
+                    
+                    const balance = await connection.getBalance(wallet.publicKey);
+                    stats.walletBalance = balance / LAMPORTS_PER_GOR;
+                    
+                    document.getElementById('connect-btn').textContent = `Connected: ${wallet.publicKey.toString().substring(0, 8)}...`;
+                    document.getElementById('connect-btn').style.background = 'rgba(0, 255, 65, 0.4)';
+                    
+                    log(`🟢 Browser wallet connected: ${wallet.publicKey.toString().substring(0, 8)}...`, 'success');
+                    log(`💰 Balance: ${stats.walletBalance.toFixed(3)} GOR`, 'success');
+                    
+                    updateDisplay();
+                } else {
+                    log('❌ No browser wallet found. Use "Use Private Key" instead!', 'error');
+                }
             } catch (error) {
                 log(`❌ Wallet connection failed: ${error.message}`, 'error');
+                log('💡 Try "Use Private Key" option instead!', 'info');
             }
         }
+
+        // Add Enter key handler for private key input
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('pk-input').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    importWallet();
+                }
+            });
+        });
 
         async function sendTestTransaction() {
             if (!walletConnected) {
@@ -412,11 +489,19 @@
                 transaction.feePayer = wallet.publicKey;
                 transaction.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
 
-                // Send transaction
-                const signature = await connection.sendTransaction(transaction, [wallet], {
-                    skipPreflight: true,
-                    preflightCommitment: 'processed'
-                });
+                // Send transaction (handle both imported wallet and browser wallet)
+                let signature;
+                if (wallet.signTransaction) {
+                    // Browser wallet
+                    const signedTx = await wallet.signTransaction(transaction);
+                    signature = await connection.sendRawTransaction(signedTx.serialize());
+                } else {
+                    // Imported keypair
+                    signature = await connection.sendTransaction(transaction, [wallet], {
+                        skipPreflight: true,
+                        preflightCommitment: 'processed'
+                    });
+                }
 
                 // Update stats immediately
                 stats.gorSpent += GOR_PER_TX;
@@ -436,6 +521,9 @@
                     }
                     pendingTxs.delete(signature);
                     log(`🎉 ${GOR_PER_TX} GOR confirmed in ${confirmTime.toFixed(2)}s`, 'success');
+                    
+                    // Update real balance from chain
+                    updateWalletBalance();
                 }).catch(() => {
                     pendingTxs.delete(signature);
                     // Refund on failed tx
@@ -451,6 +539,18 @@
                 stats.gorSpent -= GOR_PER_TX;
                 stats.walletBalance += GOR_PER_TX;
                 return false;
+            }
+        }
+
+        async function updateWalletBalance() {
+            if (!walletConnected) return;
+            
+            try {
+                const balance = await connection.getBalance(wallet.publicKey);
+                stats.walletBalance = balance / LAMPORTS_PER_GOR;
+                updateDisplay();
+            } catch (error) {
+                console.log('Failed to update balance:', error);
             }
         }
 
