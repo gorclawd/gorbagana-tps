@@ -343,7 +343,7 @@
             <div class="log-entry log-info">🗑️ Welcome to Gorbagana Speed Test!</div>
             <div class="log-entry log-info">💰 Each click spends 0.001 GOR in REAL transactions</div>
             <div class="log-entry log-info">🎯 NEW: Deposit & Test service - We handle the TPS for you! (10% fee)</div>
-            <div class="log-entry log-info">🔗 Or connect your own wallet to spend your GOR directly</div>
+            <div class="log-entry log-info">🔗 Or connect Backpack/Phantom/Solflare wallet to spend your GOR directly</div>
             <div class="log-entry log-info">⚡ Real economic activity = Real TPS measurement</div>
         </div>
     </div>
@@ -581,28 +581,70 @@
             if (walletConnected) return;
 
             try {
-                // Try to connect browser wallet (Phantom, etc.)
-                if (window.solana && window.solana.isPhantom) {
-                    const resp = await window.solana.connect();
-                    wallet = {
-                        publicKey: resp.publicKey,
-                        signTransaction: window.solana.signTransaction
-                    };
-                    walletConnected = true;
-                    
+                let walletAdapter = null;
+                let walletName = '';
+
+                // Try Backpack first (since that's what user has)
+                if (window.backpack && window.backpack.isBackpack) {
+                    walletAdapter = window.backpack;
+                    walletName = 'Backpack';
+                } 
+                // Then try Phantom
+                else if (window.solana && window.solana.isPhantom) {
+                    walletAdapter = window.solana;
+                    walletName = 'Phantom';
+                }
+                // Try other common wallets
+                else if (window.solflare && window.solflare.isSolflare) {
+                    walletAdapter = window.solflare;
+                    walletName = 'Solflare';
+                }
+                else if (window.coin98) {
+                    walletAdapter = window.coin98.sol;
+                    walletName = 'Coin98';
+                }
+
+                if (!walletAdapter) {
+                    log('❌ No supported wallet found (Backpack, Phantom, Solflare, Coin98)', 'error');
+                    log('💡 Install Backpack wallet or use "Use Private Key" option!', 'info');
+                    return;
+                }
+
+                log(`🔗 Connecting to ${walletName} wallet...`, 'info');
+                
+                const resp = await walletAdapter.connect();
+                wallet = {
+                    publicKey: resp.publicKey || resp,
+                    signTransaction: walletAdapter.signTransaction.bind(walletAdapter),
+                    signAllTransactions: walletAdapter.signAllTransactions?.bind(walletAdapter)
+                };
+                walletConnected = true;
+                
+                log(`🟢 ${walletName} connected! Getting balance...`, 'success');
+                
+                try {
                     const balance = await connection.getBalance(wallet.publicKey);
                     stats.walletBalance = balance / LAMPORTS_PER_GOR;
-                    
-                    document.getElementById('connect-btn').textContent = `Connected: ${wallet.publicKey.toString().substring(0, 8)}...`;
-                    document.getElementById('connect-btn').style.background = 'rgba(0, 255, 65, 0.4)';
-                    
-                    log(`🟢 Browser wallet connected: ${wallet.publicKey.toString().substring(0, 8)}...`, 'success');
-                    log(`💰 Balance: ${stats.walletBalance.toFixed(3)} GOR`, 'success');
-                    
-                    updateDisplay();
-                } else {
-                    log('❌ No browser wallet found. Use "Use Private Key" instead!', 'error');
+                } catch (balanceError) {
+                    log(`⚠️ Balance fetch failed, might be RPC issue`, 'error');
+                    stats.walletBalance = 0;
                 }
+                
+                document.getElementById('connect-btn').textContent = `${walletName}: ${wallet.publicKey.toString().substring(0, 8)}...`;
+                document.getElementById('connect-btn').style.background = 'rgba(0, 255, 65, 0.4)';
+                document.getElementById('pk-btn').style.display = 'none';
+                
+                log(`🟢 ${walletName} wallet connected: ${wallet.publicKey.toString().substring(0, 8)}...`, 'success');
+                if (stats.walletBalance > 0) {
+                    log(`💰 Balance: ${stats.walletBalance.toFixed(3)} GOR`, 'success');
+                    log(`🔥 Ready to spend real GOR for TPS testing!`, 'info');
+                } else {
+                    log(`💰 Balance: 0 GOR (or RPC issue)`, 'info');
+                    log(`💡 Try the deposit service instead!`, 'info');
+                }
+                
+                updateDisplay();
+                
             } catch (error) {
                 log(`❌ Wallet connection failed: ${error.message}`, 'error');
                 log('💡 Try "Use Private Key" option instead!', 'info');
@@ -653,9 +695,17 @@
                 // Send transaction (handle both imported wallet and browser wallet)
                 let signature;
                 if (wallet.signTransaction) {
-                    // Browser wallet
-                    const signedTx = await wallet.signTransaction(transaction);
-                    signature = await connection.sendRawTransaction(signedTx.serialize());
+                    // Browser wallet (Backpack, Phantom, etc.)
+                    try {
+                        const signedTx = await wallet.signTransaction(transaction);
+                        signature = await connection.sendRawTransaction(signedTx.serialize(), {
+                            skipPreflight: true,
+                            preflightCommitment: 'processed'
+                        });
+                    } catch (signError) {
+                        log(`❌ Wallet signing failed: ${signError.message}`, 'error');
+                        throw signError;
+                    }
                 } else {
                     // Imported keypair
                     signature = await connection.sendTransaction(transaction, [wallet], {
