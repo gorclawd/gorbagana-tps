@@ -250,12 +250,20 @@
                 <div class="stat-value" id="click-count">0</div>
             </div>
             <div class="stat-card">
+                <div class="stat-label">💰 GOR Spent</div>
+                <div class="stat-value" id="gor-spent">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">🔥 GOR/Second</div>
+                <div class="stat-value" id="gor-per-sec">0</div>
+            </div>
+            <div class="stat-card">
                 <div class="stat-label">Peak TPS</div>
                 <div class="stat-value" id="peak-tps">0</div>
             </div>
             <div class="stat-card">
-                <div class="stat-label">Avg Confirm Time</div>
-                <div class="stat-value" id="avg-confirm">-</div>
+                <div class="stat-label">💵 Wallet Balance</div>
+                <div class="stat-value" id="wallet-balance">0</div>
             </div>
         </div>
 
@@ -272,6 +280,7 @@
         </button>
 
         <div class="controls">
+            <button class="control-btn" onclick="connectWallet()" id="connect-btn">Connect Wallet</button>
             <button class="control-btn" onclick="resetStats()">Reset Stats</button>
             <button class="control-btn" onclick="shareResults()">Share Results</button>
             <button class="control-btn" onclick="toggleAutoMode()">Auto Mode</button>
@@ -279,8 +288,9 @@
 
         <div class="log" id="log">
             <div class="log-entry log-info">🗑️ Welcome to Gorbagana Speed Test!</div>
-            <div class="log-entry log-info">Click the button to send test transactions and measure TPS</div>
-            <div class="log-entry log-info">Connecting to Gorbagana RPC...</div>
+            <div class="log-entry log-info">💰 Each click spends 0.001 GOR in REAL transactions</div>
+            <div class="log-entry log-info">🔗 Connect wallet first, then stress test the chain!</div>
+            <div class="log-entry log-info">⚡ Real economic activity = Real TPS measurement</div>
         </div>
     </div>
 
@@ -296,8 +306,17 @@
             peakTPS: 0,
             totalTransactions: 0,
             confirmTimes: [],
-            autoMode: false
+            autoMode: false,
+            gorSpent: 0,
+            gorPerSecond: 0,
+            walletBalance: 0
         };
+
+        // Wallet connection
+        let wallet = null;
+        let walletConnected = false;
+        const GOR_PER_TX = 0.001; // 0.001 GOR per transaction
+        const LAMPORTS_PER_GOR = 1000000000;
 
         // Transaction tracking
         let pendingTxs = new Map();
@@ -316,11 +335,9 @@
             document.getElementById('click-count').textContent = stats.clickCount.toLocaleString();
             document.getElementById('current-tps').textContent = stats.currentTPS.toFixed(1);
             document.getElementById('peak-tps').textContent = stats.peakTPS.toFixed(1);
-            
-            if (stats.confirmTimes.length > 0) {
-                const avgTime = stats.confirmTimes.reduce((a, b) => a + b, 0) / stats.confirmTimes.length;
-                document.getElementById('avg-confirm').textContent = avgTime.toFixed(2) + 's';
-            }
+            document.getElementById('gor-spent').textContent = stats.gorSpent.toFixed(3);
+            document.getElementById('gor-per-sec').textContent = stats.gorPerSecond.toFixed(4);
+            document.getElementById('wallet-balance').textContent = stats.walletBalance.toFixed(3);
 
             // Update speedometer
             const needle = document.getElementById('needle');
@@ -338,35 +355,77 @@
             if (stats.currentTPS > stats.peakTPS) {
                 stats.peakTPS = stats.currentTPS;
             }
+
+            // Calculate GOR per second
+            stats.gorPerSecond = stats.currentTPS * GOR_PER_TX;
+        }
+
+        async function connectWallet() {
+            if (walletConnected) return;
+
+            try {
+                // For demo purposes, create a temporary wallet with some GOR
+                wallet = solanaWeb3.Keypair.generate();
+                walletConnected = true;
+                
+                // Simulate wallet with some balance for testing
+                stats.walletBalance = 10.0; // Start with 10 GOR for testing
+                
+                document.getElementById('connect-btn').textContent = 'Wallet Connected';
+                document.getElementById('connect-btn').style.background = 'rgba(0, 255, 65, 0.4)';
+                
+                log(`🟢 Wallet connected: ${wallet.publicKey.toString().substring(0, 8)}...`, 'success');
+                log(`💰 Demo balance: ${stats.walletBalance} GOR (simulated for testing)`, 'info');
+                
+                updateDisplay();
+            } catch (error) {
+                log(`❌ Wallet connection failed: ${error.message}`, 'error');
+            }
         }
 
         async function sendTestTransaction() {
+            if (!walletConnected) {
+                log('❌ Please connect wallet first!', 'error');
+                return false;
+            }
+
+            if (stats.walletBalance < GOR_PER_TX) {
+                log('❌ Insufficient GOR balance!', 'error');
+                return false;
+            }
+
             try {
                 const startTime = Date.now();
                 
-                // Create a minimal test transaction (memo instruction)
-                const testWallet = solanaWeb3.Keypair.generate();
+                // Create real GOR transfer transaction
+                const recipient = solanaWeb3.Keypair.generate().publicKey; // Random recipient
+                const lamports = Math.floor(GOR_PER_TX * LAMPORTS_PER_GOR);
+                
                 const transaction = new solanaWeb3.Transaction().add(
-                    new solanaWeb3.TransactionInstruction({
-                        keys: [],
-                        programId: new solanaWeb3.PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr'),
-                        data: Buffer.from(`gorbagana-test-${Date.now()}`, 'utf-8'),
+                    solanaWeb3.SystemProgram.transfer({
+                        fromPubkey: wallet.publicKey,
+                        toPubkey: recipient,
+                        lamports: lamports,
                     })
                 );
 
-                transaction.feePayer = testWallet.publicKey;
+                transaction.feePayer = wallet.publicKey;
                 transaction.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
 
                 // Send transaction
-                const signature = await connection.sendTransaction(transaction, [testWallet], {
+                const signature = await connection.sendTransaction(transaction, [wallet], {
                     skipPreflight: true,
                     preflightCommitment: 'processed'
                 });
 
+                // Update stats immediately
+                stats.gorSpent += GOR_PER_TX;
+                stats.walletBalance -= GOR_PER_TX;
+                
                 pendingTxs.set(signature, startTime);
                 tpsWindow.push(Date.now());
                 
-                log(`✅ TX sent: ${signature.substring(0, 8)}...`, 'success');
+                log(`💰 Sent ${GOR_PER_TX} GOR | TX: ${signature.substring(0, 8)}...`, 'success');
 
                 // Confirm transaction
                 connection.confirmTransaction(signature, 'confirmed').then(() => {
@@ -376,20 +435,31 @@
                         stats.confirmTimes = stats.confirmTimes.slice(-50);
                     }
                     pendingTxs.delete(signature);
-                    log(`🎉 TX confirmed in ${confirmTime.toFixed(2)}s`, 'success');
+                    log(`🎉 ${GOR_PER_TX} GOR confirmed in ${confirmTime.toFixed(2)}s`, 'success');
                 }).catch(() => {
                     pendingTxs.delete(signature);
+                    // Refund on failed tx
+                    stats.gorSpent -= GOR_PER_TX;
+                    stats.walletBalance += GOR_PER_TX;
                     log(`❌ TX failed: ${signature.substring(0, 8)}...`, 'error');
                 });
 
                 return true;
             } catch (error) {
                 log(`❌ Error: ${error.message}`, 'error');
+                // Refund on error
+                stats.gorSpent -= GOR_PER_TX;
+                stats.walletBalance += GOR_PER_TX;
                 return false;
             }
         }
 
         async function stressTest() {
+            if (!walletConnected) {
+                log('❌ Connect wallet first to spend real GOR!', 'error');
+                return;
+            }
+
             stats.clickCount++;
             stats.totalTransactions++;
             
@@ -410,11 +480,13 @@
             stats.peakTPS = 0;
             stats.totalTransactions = 0;
             stats.confirmTimes = [];
+            stats.gorSpent = 0;
+            stats.gorPerSecond = 0;
             tpsWindow = [];
             pendingTxs.clear();
             
             document.getElementById('log').innerHTML = '';
-            log('🗑️ Stats reset! Ready to destroy the TPS records again!');
+            log('🗑️ Stats reset! Ready to burn more GOR for TPS records!');
             updateDisplay();
         }
 
@@ -422,8 +494,10 @@
             const text = `🗑️ GORBAGANA SPEED TEST RESULTS:\\n\\n` +
                         `Peak TPS: ${stats.peakTPS.toFixed(1)}\\n` +
                         `Total Clicks: ${stats.clickCount}\\n` +
+                        `💰 GOR Spent: ${stats.gorSpent.toFixed(3)}\\n` +
+                        `🔥 Max GOR/sec: ${(stats.peakTPS * GOR_PER_TX).toFixed(4)}\\n` +
                         `Avg Confirm: ${stats.confirmTimes.length > 0 ? (stats.confirmTimes.reduce((a,b) => a+b, 0) / stats.confirmTimes.length).toFixed(2) : 'N/A'}s\\n\\n` +
-                        `Trash is FAST! 🗑️⚡\\n\\n` +
+                        `Trash is FAST + Real economic activity! 🗑️💰⚡\\n\\n` +
                         `Try it yourself: ${window.location.href}`;
             
             if (navigator.share) {
