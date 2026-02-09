@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🗑️ Gorbagana Speed Test | TPS Destroyer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%);
+            color: #00ff41;
+            font-family: 'Courier New', monospace;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            overflow-x: hidden;
+        }
+
+        h1 {
+            text-align: center;
+            font-size: clamp(2rem, 5vw, 4rem);
+            margin-bottom: 10px;
+            text-shadow: 0 0 20px #00ff41;
+            animation: pulse 2s infinite;
+        }
+
+        .subtitle {
+            text-align: center;
+            font-size: 1.2rem;
+            margin-bottom: 30px;
+            color: #888;
+        }
+
+        .container {
+            max-width: 800px;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 30px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            width: 100%;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: rgba(0, 255, 65, 0.1);
+            border: 2px solid #00ff41;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 255, 65, 0.3);
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            color: #999;
+            margin-bottom: 5px;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #00ff41;
+        }
+
+        .big-button {
+            width: 300px;
+            height: 300px;
+            border-radius: 50%;
+            background: radial-gradient(circle, #00ff41 0%, #008f2e 100%);
+            border: 5px solid #00ff41;
+            color: black;
+            font-size: 1.5rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.1s ease;
+            box-shadow: 0 0 50px rgba(0, 255, 65, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            text-align: center;
+            outline: none;
+        }
+
+        .big-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 80px rgba(0, 255, 65, 0.8);
+        }
+
+        .big-button:active {
+            transform: scale(0.95);
+            box-shadow: 0 0 30px rgba(0, 255, 65, 0.9);
+        }
+
+        .button-text {
+            font-size: 1.2rem;
+            margin-bottom: 5px;
+        }
+
+        .button-subtext {
+            font-size: 0.8rem;
+            opacity: 0.8;
+        }
+
+        .controls {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .control-btn {
+            padding: 10px 20px;
+            background: rgba(0, 255, 65, 0.2);
+            border: 1px solid #00ff41;
+            color: #00ff41;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-family: inherit;
+        }
+
+        .control-btn:hover {
+            background: rgba(0, 255, 65, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .log {
+            width: 100%;
+            max-width: 600px;
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid #333;
+            border-radius: 5px;
+            padding: 20px;
+            height: 200px;
+            overflow-y: auto;
+            font-size: 0.9rem;
+            line-height: 1.4;
+        }
+
+        .log-entry {
+            margin-bottom: 5px;
+            opacity: 0.8;
+        }
+
+        .log-success {
+            color: #00ff41;
+        }
+
+        .log-error {
+            color: #ff4444;
+        }
+
+        .log-info {
+            color: #44aaff;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .speedometer {
+            width: 200px;
+            height: 100px;
+            position: relative;
+            margin: 20px 0;
+        }
+
+        .gauge {
+            width: 100%;
+            height: 100%;
+            background: conic-gradient(
+                from 0deg,
+                #ff4444 0deg 60deg,
+                #ffaa00 60deg 120deg,
+                #00ff41 120deg 180deg
+            );
+            border-radius: 100px 100px 0 0;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .gauge-inner {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            bottom: 0;
+            background: #1a1a1a;
+            border-radius: 90px 90px 0 0;
+        }
+
+        .needle {
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            width: 2px;
+            height: 80px;
+            background: #00ff41;
+            transform-origin: bottom;
+            transform: translateX(-50%) rotate(0deg);
+            transition: transform 0.5s ease;
+        }
+
+        @media (max-width: 768px) {
+            .big-button {
+                width: 250px;
+                height: 250px;
+                font-size: 1.2rem;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>🗑️ GORBAGANA TPS DESTROYER</h1>
+    <p class="subtitle">Click to stress test the fastest trash chain in the universe</p>
+
+    <div class="container">
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">Current TPS</div>
+                <div class="stat-value" id="current-tps">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Your Clicks</div>
+                <div class="stat-value" id="click-count">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Peak TPS</div>
+                <div class="stat-value" id="peak-tps">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Avg Confirm Time</div>
+                <div class="stat-value" id="avg-confirm">-</div>
+            </div>
+        </div>
+
+        <div class="speedometer">
+            <div class="gauge">
+                <div class="gauge-inner"></div>
+                <div class="needle" id="needle"></div>
+            </div>
+        </div>
+
+        <button class="big-button" id="stress-button" onclick="stressTest()">
+            <div class="button-text">SEND TX</div>
+            <div class="button-subtext">Stress the trash!</div>
+        </button>
+
+        <div class="controls">
+            <button class="control-btn" onclick="resetStats()">Reset Stats</button>
+            <button class="control-btn" onclick="shareResults()">Share Results</button>
+            <button class="control-btn" onclick="toggleAutoMode()">Auto Mode</button>
+        </div>
+
+        <div class="log" id="log">
+            <div class="log-entry log-info">🗑️ Welcome to Gorbagana Speed Test!</div>
+            <div class="log-entry log-info">Click the button to send test transactions and measure TPS</div>
+            <div class="log-entry log-info">Connecting to Gorbagana RPC...</div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@solana/web3.js@latest/lib/index.iife.min.js"></script>
+    <script>
+        // Gorbagana connection
+        const connection = new solanaWeb3.Connection('https://rpc.trashscan.io', 'confirmed');
+        
+        // Stats tracking
+        let stats = {
+            clickCount: 0,
+            currentTPS: 0,
+            peakTPS: 0,
+            totalTransactions: 0,
+            confirmTimes: [],
+            autoMode: false
+        };
+
+        // Transaction tracking
+        let pendingTxs = new Map();
+        let tpsWindow = [];
+
+        function log(message, type = 'info') {
+            const logEl = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logEl.appendChild(entry);
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+
+        function updateDisplay() {
+            document.getElementById('click-count').textContent = stats.clickCount.toLocaleString();
+            document.getElementById('current-tps').textContent = stats.currentTPS.toFixed(1);
+            document.getElementById('peak-tps').textContent = stats.peakTPS.toFixed(1);
+            
+            if (stats.confirmTimes.length > 0) {
+                const avgTime = stats.confirmTimes.reduce((a, b) => a + b, 0) / stats.confirmTimes.length;
+                document.getElementById('avg-confirm').textContent = avgTime.toFixed(2) + 's';
+            }
+
+            // Update speedometer
+            const needle = document.getElementById('needle');
+            const maxTPS = 5000;
+            const angle = Math.min((stats.currentTPS / maxTPS) * 180, 180);
+            needle.style.transform = `translateX(-50%) rotate(${angle}deg)`;
+        }
+
+        function calculateTPS() {
+            const now = Date.now();
+            // Remove old entries (older than 1 second)
+            tpsWindow = tpsWindow.filter(timestamp => now - timestamp < 1000);
+            stats.currentTPS = tpsWindow.length;
+            
+            if (stats.currentTPS > stats.peakTPS) {
+                stats.peakTPS = stats.currentTPS;
+            }
+        }
+
+        async function sendTestTransaction() {
+            try {
+                const startTime = Date.now();
+                
+                // Create a minimal test transaction (memo instruction)
+                const testWallet = solanaWeb3.Keypair.generate();
+                const transaction = new solanaWeb3.Transaction().add(
+                    new solanaWeb3.TransactionInstruction({
+                        keys: [],
+                        programId: new solanaWeb3.PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr'),
+                        data: Buffer.from(`gorbagana-test-${Date.now()}`, 'utf-8'),
+                    })
+                );
+
+                transaction.feePayer = testWallet.publicKey;
+                transaction.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+
+                // Send transaction
+                const signature = await connection.sendTransaction(transaction, [testWallet], {
+                    skipPreflight: true,
+                    preflightCommitment: 'processed'
+                });
+
+                pendingTxs.set(signature, startTime);
+                tpsWindow.push(Date.now());
+                
+                log(`✅ TX sent: ${signature.substring(0, 8)}...`, 'success');
+
+                // Confirm transaction
+                connection.confirmTransaction(signature, 'confirmed').then(() => {
+                    const confirmTime = (Date.now() - startTime) / 1000;
+                    stats.confirmTimes.push(confirmTime);
+                    if (stats.confirmTimes.length > 100) {
+                        stats.confirmTimes = stats.confirmTimes.slice(-50);
+                    }
+                    pendingTxs.delete(signature);
+                    log(`🎉 TX confirmed in ${confirmTime.toFixed(2)}s`, 'success');
+                }).catch(() => {
+                    pendingTxs.delete(signature);
+                    log(`❌ TX failed: ${signature.substring(0, 8)}...`, 'error');
+                });
+
+                return true;
+            } catch (error) {
+                log(`❌ Error: ${error.message}`, 'error');
+                return false;
+            }
+        }
+
+        async function stressTest() {
+            stats.clickCount++;
+            stats.totalTransactions++;
+            
+            const success = await sendTestTransaction();
+            if (success) {
+                // Visual feedback
+                const button = document.getElementById('stress-button');
+                button.style.background = 'radial-gradient(circle, #44ff44 0%, #00aa00 100%)';
+                setTimeout(() => {
+                    button.style.background = 'radial-gradient(circle, #00ff41 0%, #008f2e 100%)';
+                }, 100);
+            }
+        }
+
+        function resetStats() {
+            stats.clickCount = 0;
+            stats.currentTPS = 0;
+            stats.peakTPS = 0;
+            stats.totalTransactions = 0;
+            stats.confirmTimes = [];
+            tpsWindow = [];
+            pendingTxs.clear();
+            
+            document.getElementById('log').innerHTML = '';
+            log('🗑️ Stats reset! Ready to destroy the TPS records again!');
+            updateDisplay();
+        }
+
+        function shareResults() {
+            const text = `🗑️ GORBAGANA SPEED TEST RESULTS:\\n\\n` +
+                        `Peak TPS: ${stats.peakTPS.toFixed(1)}\\n` +
+                        `Total Clicks: ${stats.clickCount}\\n` +
+                        `Avg Confirm: ${stats.confirmTimes.length > 0 ? (stats.confirmTimes.reduce((a,b) => a+b, 0) / stats.confirmTimes.length).toFixed(2) : 'N/A'}s\\n\\n` +
+                        `Trash is FAST! 🗑️⚡\\n\\n` +
+                        `Try it yourself: ${window.location.href}`;
+            
+            if (navigator.share) {
+                navigator.share({ text });
+            } else {
+                navigator.clipboard.writeText(text);
+                log('📋 Results copied to clipboard!');
+            }
+        }
+
+        function toggleAutoMode() {
+            stats.autoMode = !stats.autoMode;
+            const btn = event.target;
+            btn.textContent = stats.autoMode ? 'Stop Auto' : 'Auto Mode';
+            
+            if (stats.autoMode) {
+                log('🤖 Auto mode enabled! Sending transactions automatically...');
+                autoClick();
+            } else {
+                log('✋ Auto mode disabled');
+            }
+        }
+
+        function autoClick() {
+            if (stats.autoMode) {
+                stressTest();
+                setTimeout(autoClick, 100); // Send TX every 100ms in auto mode
+            }
+        }
+
+        // Update TPS calculation every 100ms
+        setInterval(() => {
+            calculateTPS();
+            updateDisplay();
+        }, 100);
+
+        // Initialize
+        log('🚀 Connected to Gorbagana! Ready to test speed!');
+        updateDisplay();
+    </script>
+</body>
+</html>

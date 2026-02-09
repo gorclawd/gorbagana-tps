@@ -1,0 +1,20 @@
+{
+  "name": "gorbagana-tps-tester",
+  "version": "1.0.0",
+  "description": "🗑️ Gorbagana TPS Speed Test - Stress the fastest trash chain",
+  "main": "index.html",
+  "scripts": {
+    "dev": "python3 -m http.server 8080",
+    "build": "echo 'Static build - ready to deploy!'",
+    "deploy": "echo 'Deploy to GitHub Pages or similar'"
+  },
+  "keywords": [
+    "gorbagana",
+    "blockchain",
+    "tps",
+    "speed-test",
+    "crypto"
+  ],
+  "author": "gorbro",
+  "license": "MIT"
+}
