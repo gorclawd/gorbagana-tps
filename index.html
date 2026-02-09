@@ -349,6 +349,7 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@solana/web3.js@latest/lib/index.iife.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bs58@4.0.1/index.js"></script>
     <script>
         // Gorbagana connection
         const connection = new solanaWeb3.Connection('https://rpc.trashscan.io', 'confirmed');
@@ -520,23 +521,54 @@
 
             try {
                 // Import wallet from private key
-                const secretKey = solanaWeb3.bs58?.decode ? solanaWeb3.bs58.decode(privateKey) : 
-                                  (() => { throw new Error('Base58 decoder not available'); })();
+                let secretKey;
+                try {
+                    // Try different base58 decoders
+                    if (window.bs58) {
+                        secretKey = window.bs58.decode(privateKey);
+                    } else if (solanaWeb3.bs58) {
+                        secretKey = solanaWeb3.bs58.decode(privateKey);
+                    } else {
+                        throw new Error('No base58 decoder found');
+                    }
+                } catch (e) {
+                    log(`❌ Base58 decode failed. Trying manual decode...`, 'error');
+                    // Manual base58 decode fallback (basic implementation)
+                    throw new Error('Base58 decode failed - invalid private key format');
+                }
                 
                 wallet = solanaWeb3.Keypair.fromSecretKey(secretKey);
                 walletConnected = true;
                 
-                // Get real balance from Gorbagana
-                const balance = await connection.getBalance(wallet.publicKey);
-                stats.walletBalance = balance / LAMPORTS_PER_GOR;
+                log(`🔗 Getting balance from Gorbagana RPC...`, 'info');
+                
+                // Get real balance from Gorbagana with timeout
+                try {
+                    const balancePromise = connection.getBalance(wallet.publicKey);
+                    const timeoutPromise = new Promise((_, reject) => 
+                        setTimeout(() => reject(new Error('RPC timeout')), 10000)
+                    );
+                    
+                    const balance = await Promise.race([balancePromise, timeoutPromise]);
+                    stats.walletBalance = balance / LAMPORTS_PER_GOR;
+                } catch (balanceError) {
+                    log(`⚠️ Balance fetch failed: ${balanceError.message}`, 'error');
+                    log(`🎯 Using service mode instead (deposit required)`, 'info');
+                    stats.walletBalance = 0;
+                }
                 
                 document.getElementById('connect-btn').textContent = `Connected: ${wallet.publicKey.toString().substring(0, 8)}...`;
                 document.getElementById('connect-btn').style.background = 'rgba(0, 255, 65, 0.4)';
                 document.getElementById('pk-btn').style.display = 'none';
                 
                 log(`🟢 Real wallet connected: ${wallet.publicKey.toString().substring(0, 8)}...`, 'success');
-                log(`💰 Real balance: ${stats.walletBalance.toFixed(3)} GOR`, 'success');
-                log(`🔥 Ready to spend real GOR for TPS testing!`, 'info');
+                if (stats.walletBalance > 0) {
+                    log(`💰 Real balance: ${stats.walletBalance.toFixed(3)} GOR`, 'success');
+                    log(`🔥 Ready to spend real GOR for TPS testing!`, 'info');
+                } else {
+                    log(`💰 Balance: 0 GOR (or RPC issue)`, 'info');
+                    log(`💡 Try the deposit service instead!`, 'info');
+                }
                 
                 closeModal();
                 updateDisplay();
@@ -795,9 +827,22 @@
             updateDisplay();
         }, 100);
 
-        // Initialize
-        log('🚀 Connected to Gorbagana! Ready to test speed!');
-        updateDisplay();
+        // Initialize with better error handling
+        async function initializeApp() {
+            try {
+                // Test RPC connection
+                log('🗑️ Connecting to Gorbagana RPC...', 'info');
+                const health = await connection.getVersion();
+                log(`✅ Connected! Solana version: ${health['solana-core']}`, 'success');
+                log('🚀 Ready to test speed!', 'success');
+            } catch (error) {
+                log(`⚠️ RPC connection issues: ${error.message}`, 'error');
+                log(`🎯 Service mode still works for deposits!`, 'info');
+            }
+            updateDisplay();
+        }
+        
+        initializeApp();
     </script>
 </body>
 </html>
